@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Relay Stats — Check Your Bridge Activity</title>
+  <meta name="description" content="Check your Relay bridge stats instantly. No wallet connect. No signup. Free forever."/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080c10;
+      --surface: #0e1419;
+      --surface2: #141c24;
+      --border: #1e2d3d;
+      --teal: #00d4aa;
+      --teal-dim: rgba(0,212,170,0.1);
+      --teal-glow: rgba(0,212,170,0.2);
+      --text: #e8f0f7;
+      --muted: #5a7a8a;
+      --red: #f87171;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,170,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,170,0.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+    .glow {
+      position: fixed;
+      width: 700px; height: 700px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,170,0.05) 0%, transparent 70%);
+      top: -250px; left: 50%; transform: translateX(-50%);
+      pointer-events: none; z-index: 0;
+    }
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 800px; margin: 0 auto; padding: 0 20px;
+    }
+
+    /* ── HEADER ── */
+    header { padding: 44px 0 0; text-align: center; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--teal-dim);
+      border: 1px solid rgba(0,212,170,0.18);
+      border-radius: 20px; padding: 5px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--teal);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 26px;
+    }
+    .dot { width: 6px; height: 6px; background: var(--teal); border-radius: 50%; animation: blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    h1 {
+      font-size: clamp(2rem, 6vw, 3.6rem);
+      font-weight: 800; line-height: 1.05;
+      letter-spacing: -0.02em; margin-bottom: 14px;
+    }
+    h1 span { color: var(--teal); }
+    .sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--muted);
+      line-height: 1.8; max-width: 460px;
+      margin: 0 auto 44px;
+    }
+
+    /* ── SEARCH ── */
+    .search-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 6px 6px 6px 18px;
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .search-box:focus-within {
+      border-color: rgba(0,212,170,0.35);
+      box-shadow: 0 0 0 3px var(--teal-dim);
+    }
+    .search-icon { color: var(--muted); font-size: 15px; flex-shrink: 0; }
+    #walletInput {
+      flex: 1; background: none; border: none; outline: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--text); min-width: 0;
+    }
+    #walletInput::placeholder { color: var(--muted); }
+    #searchBtn {
+      background: var(--teal); color: #000;
+      border: none; border-radius: 10px;
+      padding: 12px 22px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 13px;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: background .2s, transform .1s;
+    }
+    #searchBtn:hover { background: #00f0c0; }
+    #searchBtn:active { transform: scale(0.97); }
+    #searchBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hint {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--muted);
+      text-align: center; margin-bottom: 50px;
+    }
+
+    /* ── PROGRESS ── */
+    #progressWrap {
+      display: none; text-align: center; padding: 50px 0;
+    }
+    .progress-bar-bg {
+      background: var(--surface2);
+      border-radius: 99px; height: 4px;
+      max-width: 300px; margin: 0 auto 16px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: var(--teal);
+      border-radius: 99px; width: 0%;
+      transition: width .4s ease;
+    }
+    .progress-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted);
+    }
+
+    /* ── ERROR ── */
+    #errorBox {
+      display: none;
+      background: rgba(248,113,113,0.07);
+      border: 1px solid rgba(248,113,113,0.2);
+      border-radius: 12px; padding: 14px 18px;
+      margin-bottom: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--red);
+    }
+
+    /* ── RESULTS ── */
+    #results { display: none; animation: fadeUp .5s ease both; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .wallet-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted);
+      text-align: center; margin-bottom: 26px;
+    }
+    .wallet-tag span { color: var(--teal); }
+
+    /* ── STAT CARDS ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px; margin-bottom: 12px;
+    }
+    @media(max-width:480px){ .stats-grid{ grid-template-columns:1fr; } }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 22px 22px;
+      position: relative; overflow: hidden;
+      transition: border-color .2s, transform .2s;
+    }
+    .card:hover { border-color: rgba(0,212,170,0.18); transform: translateY(-2px); }
+    .card::after {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--teal), transparent);
+      opacity: 0; transition: opacity .2s;
+    }
+    .card:hover::after { opacity: 1; }
+    .card.hero {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, var(--surface) 0%, rgba(0,212,170,0.04) 100%);
+      border-color: rgba(0,212,170,0.14);
+    }
+    .card-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--muted); margin-bottom: 10px;
+    }
+    .card-value {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+    }
+    .card.hero .card-value { color: var(--teal); font-size: clamp(2.2rem, 5vw, 3rem); }
+    .card-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--muted); margin-top: 6px;
+    }
+
+    /* ── CHAINS ── */
+    .chains-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px 22px; margin-bottom: 12px;
+    }
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--muted); margin-bottom: 14px;
+    }
+    .chains-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chain-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 11px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--text);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pill-count {
+      background: var(--teal-dim); color: var(--teal);
+      border-radius: 4px; padding: 1px 6px; font-size: 10px;
+    }
+
+    /* ── SHARE CARD ── */
+    .share-section {
+      background: var(--surface);
+      border: 1px solid rgba(0,212,170,0.14);
+      border-radius: 14px; padding: 22px;
+      margin-bottom: 12px; text-align: center;
+    }
+    .share-title {
+      font-size: 15px; font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .share-desc {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--muted); margin-bottom: 18px;
+    }
+    .share-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn-outline {
+      background: none; border: 1px solid var(--teal);
+      color: var(--teal); border-radius: 10px;
+      padding: 10px 20px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 13px;
+      cursor: pointer; transition: background .2s, color .2s;
+    }
+    .btn-outline:hover { background: var(--teal); color: #000; }
+    .btn-solid {
+      background: var(--teal); color: #000;
+      border: none; border-radius: 10px;
+      padding: 10px 20px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 13px;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-solid:hover { background: #00f0c0; }
+
+    /* ── HIDDEN SHARE CARD (for canvas render) ── */
+    #shareCard {
+      position: fixed; left: -9999px; top: 0;
+      width: 600px; padding: 40px;
+      background: #080c10;
+      font-family: 'Syne', sans-serif;
+    }
+    .sc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+    .sc-title { font-size: 22px; font-weight: 800; color: #e8f0f7; }
+    .sc-title span { color: #00d4aa; }
+    .sc-by { font-size: 12px; color: #5a7a8a; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+    .sc-wallet { font-size: 11px; color: #00d4aa; font-family: 'JetBrains Mono', monospace; }
+    .sc-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+    .sc-stat { background: #0e1419; border: 1px solid #1e2d3d; border-radius: 10px; padding: 16px; }
+    .sc-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: #5a7a8a; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px; }
+    .sc-stat-value { font-size: 22px; font-weight: 800; color: #e8f0f7; }
+    .sc-stat-value.big { color: #00d4aa; font-size: 28px; }
+    .sc-chains-label { font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: #5a7a8a; font-family: 'JetBrains Mono', monospace; margin-bottom: 10px; }
+    .sc-chains { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
+    .sc-chain { background: #141c24; border: 1px solid #1e2d3d; border-radius: 6px; padding: 4px 10px; font-size: 10px; color: #e8f0f7; font-family: 'JetBrains Mono', monospace; }
+    .sc-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1e2d3d; padding-top: 16px; }
+    .sc-footer-left { font-size: 11px; color: #5a7a8a; font-family: 'JetBrains Mono', monospace; }
+    .sc-footer-right { font-size: 13px; font-weight: 700; color: #00d4aa; }
+
+    /* ── TX LIST ── */
+    .tx-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; margin-bottom: 12px;
+    }
+    .tx-head {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .tx-badge {
+      background: var(--teal-dim); color: var(--teal);
+      border-radius: 6px; padding: 3px 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    }
+    .tx-row {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px;
+      transition: background .15s;
+    }
+    .tx-row:last-child { border-bottom: none; }
+    .tx-row:hover { background: var(--surface2); }
+    .tx-chains {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 2px; flex-shrink: 0;
+    }
+    .tx-chain-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--muted); white-space: nowrap;
+    }
+    .tx-arrow-icon { color: var(--teal); font-size: 11px; }
+    .tx-meta { flex: 1; min-width: 0; }
+    .tx-amt {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; font-weight: 500; margin-bottom: 3px;
+    }
+    .tx-date { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); }
+    .tx-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; padding: 3px 9px; border-radius: 6px; flex-shrink: 0;
+    }
+    .s-ok  { background: rgba(0,212,170,0.1); color: var(--teal); }
+    .s-pend{ background: rgba(251,191,36,0.1); color: #fbbf24; }
+    .s-fail{ background: rgba(248,113,113,0.1); color: var(--red); }
+
+    .show-more-btn {
+      display: block; width: 100%;
+      background: none; border: none;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted);
+      cursor: pointer; text-align: center;
+      border-top: 1px solid var(--border);
+      transition: color .2s, background .2s;
+    }
+    .show-more-btn:hover { color: var(--teal); background: var(--surface2); }
+
+    /* ── DONATE ── */
+    .donate-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 26px 24px;
+      margin-bottom: 12px;
+    }
+    .donate-top { margin-bottom: 20px; }
+    .donate-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .donate-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted); line-height: 1.8;
+    }
+    .donate-text strong { color: var(--text); }
+    .addr-row {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .addr-left { min-width: 0; }
+    .addr-network {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--teal); margin-bottom: 5px;
+    }
+    .addr-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--muted);
+      white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 380px;
+    }
+    .copy-btn {
+      background: var(--teal-dim); color: var(--teal);
+      border: 1px solid rgba(0,212,170,0.2);
+      border-radius: 7px; padding: 7px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; cursor: pointer; flex-shrink: 0;
+      transition: background .2s;
+    }
+    .copy-btn:hover { background: var(--teal-glow); }
+    .copy-btn.copied { color: #4ade80; border-color: #4ade80; background: rgba(74,222,128,0.1); }
+
+    /* ── EMPTY ── */
+    .empty {
+      text-align: center; padding: 52px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--muted);
+    }
+    .empty-icon { font-size: 38px; margin-bottom: 14px; opacity: .4; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 28px 0 52px;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+    .footer-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--muted); line-height: 2.2;
+    }
+    .footer-text a { color: var(--teal); text-decoration: none; }
+    .footer-text a:hover { text-decoration: underline; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface); border: 1px solid var(--teal);
+      color: var(--teal); border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      z-index: 999; transition: transform .3s ease, opacity .3s ease;
+      opacity: 0; white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="glow"></div>
+<div id="toast"></div>
+
+<!-- Hidden share card for image generation -->
+<div id="shareCard">
+  <div class="sc-header">
+    <div>
+      <div class="sc-title">Relay <span>Bridge Stats</span></div>
+      <div class="sc-by">Built by @alpinoWolf</div>
+    </div>
+    <div class="sc-wallet" id="sc-wallet"></div>
+  </div>
+  <div class="sc-stats">
+    <div class="sc-stat" style="grid-column:1/4">
+      <div class="sc-stat-label">Total Volume Bridged</div>
+      <div class="sc-stat-value big" id="sc-vol">—</div>
+    </div>
+    <div class="sc-stat">
+      <div class="sc-stat-label">Transactions</div>
+      <div class="sc-stat-value" id="sc-txs">—</div>
+    </div>
+    <div class="sc-stat">
+      <div class="sc-stat-label">Chains Used</div>
+      <div class="sc-stat-value" id="sc-chains">—</div>
+    </div>
+    <div class="sc-stat">
+      <div class="sc-stat-label">Success Rate</div>
+      <div class="sc-stat-value" id="sc-rate">—</div>
+    </div>
+  </div>
+  <div class="sc-chains-label">Chains Active On</div>
+  <div class="sc-chains" id="sc-chain-list"></div>
+  <div class="sc-footer">
+    <div class="sc-footer-left">relay.link • powered by Relay Protocol</div>
+    <div class="sc-footer-right">@alpinoWolf</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="badge"><div class="dot"></div>Relay Protocol · Live Data</div>
+    <h1>Your Relay<br/><span>Bridge Stats</span></h1>
+    <p class="sub">
+      Paste any wallet — see your full cross-chain activity.<br/>
+      No wallet connect. No signup. 100% free.
+    </p>
+  </header>
+
+  <div class="search-box">
+    <span class="search-icon">⬡</span>
+    <input type="text" id="walletInput" placeholder="Paste your wallet address  0x..." autocomplete="off" spellcheck="false"/>
+    <button id="searchBtn" onclick="startFetch()">Check Stats →</button>
+  </div>
+  <p class="hint">Works with any EVM wallet · Data from Relay Protocol API</p>
+
+  <div id="errorBox"></div>
+
+  <div id="progressWrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <p class="progress-label" id="progressLabel">Fetching your transactions...</p>
+  </div>
+
+  <div id="results"></div>
+
+  <!-- ── DONATE — always visible ── -->
+  <div class="donate-section">
+    <div class="donate-top">
+      <div class="donate-title">☕ Support This Tool</div>
+      <p class="donate-text">
+        This tool is <strong>100% free, forever</strong> — no ads, no VC money, no paywalls.<br/>
+        Built by one person for the community. If it saved you time, a small tip goes a long way
+        and helps keep new tools coming. But seriously — <strong>no pressure at all.</strong> 🙏
+      </p>
+    </div>
+    <div class="addr-row">
+      <div class="addr-left">
+        <div class="addr-network">EVM · Ethereum / Base / Arbitrum / Any EVM chain</div>
+        <div class="addr-val">0x6249723445128956aaa6251ec6fda192c386ed3c</div>
+      </div>
+      <button class="copy-btn" onclick="copyAddr('0x6249723445128956aaa6251ec6fda192c386ed3c',this)">Copy</button>
+    </div>
+    <div class="addr-row">
+      <div class="addr-left">
+        <div class="addr-network">Solana · SOL / USDC</div>
+        <div class="addr-val">6KEFH6L7jDrGbAmEpoFmm98z6TEVXGh1XXaxiu84ZtYF</div>
+      </div>
+      <button class="copy-btn" onclick="copyAddr('6KEFH6L7jDrGbAmEpoFmm98z6TEVXGh1XXaxiu84ZtYF',this)">Copy</button>
+    </div>
+    <div class="addr-row">
+      <div class="addr-left">
+        <div class="addr-network">Bitcoin · BTC</div>
+        <div class="addr-val">bc1q9ehq9x08pdcqmca9elqm0l6t2d0a2e8kqypshz</div>
+      </div>
+      <button class="copy-btn" onclick="copyAddr('bc1q9ehq9x08pdcqmca9elqm0l6t2d0a2e8kqypshz',this)">Copy</button>
+    </div>
+  </div>
+
+  <footer>
+    <p class="footer-text">
+      Built free for the web3 community by
+      <a href="https://twitter.com/alpinoWolf" target="_blank">@alpinoWolf</a><br/>
+      Data sourced from <a href="https://relay.link" target="_blank">relay.link</a> · No data stored · No wallet connection needed
+    </p>
+  </footer>
+</div>
+
+<script>
+// ── CHAIN NAMES ──
+const CHAINS = {
+  1:'Ethereum', 10:'Optimism', 8453:'Base', 42161:'Arbitrum',
+  137:'Polygon', 56:'BNB Chain', 43114:'Avalanche', 7777777:'Zora',
+  534352:'Scroll', 59144:'Linea', 81457:'Blast', 324:'zkSync',
+  1101:'Polygon zkEVM', 100:'Gnosis', 34443:'Mode', 1116:'Core',
+  792703809:'Solana', 60808:'BOB', 255:'Kroma', 5000:'Mantle',
+};
+const chainName = id => CHAINS[id] || `Chain ${id}`;
+
+// ── FORMAT ──
+function fmtUSD(v) {
+  const n = parseFloat(v||0);
+  if(n>=1_000_000) return '$'+(n/1_000_000).toFixed(2)+'M';
+  if(n>=1_000)     return '$'+(n/1_000).toFixed(1)+'K';
+  return '$'+n.toFixed(2);
+}
+function fmtDate(ts) {
+  if(!ts) return '—';
+  const d = new Date(typeof ts==='number' ? ts*1000 : ts);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+// ── TOAST ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ── COPY ──
+function copyAddr(text, btn) {
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent = '✓ Copied'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(()=>toast('✓ Copied to clipboard'));
+}
+
+// ── COUNT UP ANIMATION ──
+function countUp(el, target, prefix='', suffix='', dur=1200) {
+  const start = performance.now();
+  const isFloat = String(target).includes('.');
+  const run = now => {
+    const p = Math.min((now-start)/dur, 1);
+    const e = 1-Math.pow(1-p,3);
+    const cur = e*target;
+    el.textContent = prefix+(isFloat ? cur.toFixed(2) : Math.floor(cur))+suffix;
+    if(p<1) requestAnimationFrame(run);
+  };
+  requestAnimationFrame(run);
+}
+
+// ── GLOBAL STATE ──
+let allTxs = [];
+let visibleCount = 20;
+
+// ── INPUT ENTER ──
+document.getElementById('walletInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter') startFetch();
+});
+
+// ── FETCH WITH PAGINATION ──
+async function startFetch() {
+  const wallet = document.getElementById('walletInput').value.trim();
+  if(!wallet){ showErr('Please paste a wallet address.'); return; }
+  if(!wallet.startsWith('0x') || wallet.length < 20){
+    showErr('Please enter a valid EVM wallet address starting with 0x'); return;
+  }
+
+  clearErr();
+  document.getElementById('searchBtn').disabled = true;
+  document.getElementById('results').style.display = 'none';
+  showProgress('Starting fetch...', 5);
+
+  allTxs = [];
+  let cursor = null;
+  let page = 0;
+  const MAX_PAGES = 20; // up to 2000 transactions
+
+  try {
+    while(true) {
+      page++;
+      const pct = Math.min(page * 8, 90);
+      showProgress(`Fetching page ${page}...`, pct);
+
+      let url = `https://api.relay.link/requests/v2?user=${wallet}&limit=100`;
+      if(cursor) url += `&continuation=${cursor}`;
+
+      const res = await fetch(url);
+      if(!res.ok) {
+        // fallback to v1
+        let url2 = `https://api.relay.link/requests?user=${wallet}&limit=100`;
+        const res2 = await fetch(url2);
+        if(!res2.ok) throw new Error('API error');
+        const d2 = await res2.json();
+        const items = d2.requests || d2 || [];
+        allTxs = allTxs.concat(Array.isArray(items)?items:[]);
+        break;
+      }
+
+      const data = await res.json();
+      const items = data.requests || data.data || data || [];
+      if(Array.isArray(items)) allTxs = allTxs.concat(items);
+
+      cursor = data.continuation || data.nextCursor || null;
+      if(!cursor || items.length < 100 || page >= MAX_PAGES) break;
+    }
+
+    showProgress('Building your stats...', 98);
+    await new Promise(r=>setTimeout(r,400));
+
+    hideProgress();
+    visibleCount = 20;
+    renderResults(wallet);
+
+  } catch(err) {
+    hideProgress();
+    showErr('Could not fetch data. Check your wallet address and try again.');
+    console.error(err);
+  } finally {
+    document.getElementById('searchBtn').disabled = false;
+  }
+}
+
+function showProgress(label, pct) {
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressFill').style.width = pct+'%';
+}
+function hideProgress() {
+  document.getElementById('progressWrap').style.display = 'none';
+}
+function showErr(msg) {
+  const e = document.getElementById('errorBox');
+  e.style.display='block'; e.textContent='⚠ '+msg;
+}
+function clearErr() {
+  document.getElementById('errorBox').style.display='none';
+}
+
+// ── RENDER RESULTS ──
+function renderResults(wallet) {
+  const txs = allTxs;
+  const el = document.getElementById('results');
+
+  if(!txs.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div>No Relay transactions found for this wallet.<br/>This wallet hasn't used Relay yet.</div>`;
+    el.style.display = 'block';
+    return;
+  }
+
+  // ── COMPUTE ──
+  let totalUSD = 0, feeTotal = 0;
+  const chainUsage = {};
+  const successful = txs.filter(t=>{
+    const s = t?.status||'';
+    return ['success','completed','fill','fulfilled'].includes(s);
+  });
+
+  txs.forEach(tx=>{
+    const usd = parseFloat(
+      tx?.data?.inAmountUsd || tx?.inAmountUsd ||
+      tx?.metadata?.currencyIn?.amountUsd || 0
+    );
+    if(usd) totalUSD += usd;
+
+    const fee = parseFloat(tx?.data?.feesUsd||tx?.fees?.totalFeeUsd||0);
+    if(fee) feeTotal += fee;
+
+    const from = tx?.data?.originChainId||tx?.originChainId;
+    const to   = tx?.data?.destinationChainId||tx?.destinationChainId;
+    if(from) chainUsage[from] = (chainUsage[from]||0)+1;
+    if(to && to!==from) chainUsage[to] = (chainUsage[to]||0)+1;
+  });
+
+  const uniqueChains = Object.keys(chainUsage).length;
+  const successRate = txs.length ? Math.round((successful.length/txs.length)*100) : 0;
+  const shortW = wallet.slice(0,6)+'...'+wallet.slice(-4);
+
+  // Populate share card data
+  document.getElementById('sc-wallet').textContent = shortW;
+  document.getElementById('sc-vol').textContent = fmtUSD(totalUSD);
+  document.getElementById('sc-txs').textContent = txs.length;
+  document.getElementById('sc-chains').textContent = uniqueChains;
+  document.getElementById('sc-rate').textContent = successRate+'%';
+  document.getElementById('sc-chain-list').innerHTML = Object.entries(chainUsage)
+    .sort((a,b)=>b[1]-a[1]).slice(0,8)
+    .map(([id])=>`<div class="sc-chain">${chainName(parseInt(id))}</div>`).join('');
+
+  // Chain pills
+  const chainPills = Object.entries(chainUsage)
+    .sort((a,b)=>b[1]-a[1]).slice(0,14)
+    .map(([id,cnt])=>`
+      <div class="chain-pill">
+        ${chainName(parseInt(id))}
+        <span class="pill-count">${cnt}</span>
+      </div>`).join('');
+
+  // Share text for copy
+  const shareText = `🔗 My Relay Bridge Stats\n\n💰 Volume: ${fmtUSD(totalUSD)}\n📊 Transactions: ${txs.length}\n⛓ Chains: ${uniqueChains}\n✅ Success rate: ${successRate}%\n\nCheck yours 👇\nhttps://twitter.com/alpinoWolf`;
+
+  // Build TX rows
+  el.innerHTML = `
+    <p class="wallet-tag">Showing results for <span>${shortW}</span> · ${txs.length} transactions found</p>
+
+    <div class="stats-grid">
+      <div class="card hero">
+        <div class="card-label">Total Volume Bridged</div>
+        <div class="card-value" id="r-vol">$0.00</div>
+        <div class="card-sub">across all your transactions</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Total Transactions</div>
+        <div class="card-value" id="r-txs">0</div>
+        <div class="card-sub">${successful.length} successful</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Chains Used</div>
+        <div class="card-value" id="r-chains">0</div>
+        <div class="card-sub">${uniqueChains} unique networks</div>
+      </div>
+    </div>
+
+    <div class="chains-card">
+      <div class="section-label">Chain Activity Breakdown</div>
+      <div class="chains-wrap">${chainPills||'<span style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--muted)">No chain data available</span>'}</div>
+    </div>
+
+    <div class="share-section">
+      <div class="share-title">Share Your Stats 📤</div>
+      <div class="share-desc">Download as image or copy a summary — share on X, Telegram, Discord or WhatsApp</div>
+      <div class="share-btns">
+        <button class="btn-solid" onclick="downloadCard()">⬇ Download Image Card</button>
+        <button class="btn-outline" onclick="copyText(\`${shareText.replace(/`/g,'\\`')}\`)">📋 Copy Summary</button>
+        <button class="btn-outline" onclick="shareX()">𝕏 Share on X</button>
+      </div>
+    </div>
+
+    <div class="tx-wrap" id="txWrap">
+      <div class="tx-head">
+        <span class="section-label" style="margin:0">Recent Transactions</span>
+        <span class="tx-badge" id="txBadge">Loading...</span>
+      </div>
+      <div id="txList"></div>
+    </div>
+  `;
+
+  el.style.display = 'block';
+
+  // Animate numbers
+  setTimeout(()=>{
+    countUp(document.getElementById('r-vol'), totalUSD, '$', '', 1400);
+    countUp(document.getElementById('r-txs'), txs.length, '', '', 1000);
+    countUp(document.getElementById('r-chains'), uniqueChains, '', '', 800);
+  }, 100);
+
+  renderTxRows();
+}
+
+// ── RENDER TX ROWS ──
+function renderTxRows() {
+  const txs = allTxs;
+  const list = document.getElementById('txList');
+  const badge = document.getElementById('txBadge');
+  if(!list) return;
+
+  const showing = txs.slice(0, visibleCount);
+  badge.textContent = `${txs.length} total`;
+
+  list.innerHTML = showing.map(tx=>{
+    const from = tx?.data?.originChainId||tx?.originChainId;
+    const to   = tx?.data?.destinationChainId||tx?.destinationChainId;
+    const usd  = parseFloat(tx?.data?.inAmountUsd||tx?.inAmountUsd||0);
+    const ts   = tx?.createdAt||tx?.data?.createdAt;
+    const s    = tx?.status||'unknown';
+    let sc='s-pend', sl=s;
+    if(['success','completed','fill','fulfilled'].includes(s)){sc='s-ok';sl='success';}
+    if(['failed','error','refund'].includes(s)){sc='s-fail';sl='failed';}
+    return `
+      <div class="tx-row">
+        <div class="tx-chains">
+          <span class="tx-chain-name">${chainName(from)}</span>
+          <span class="tx-arrow-icon">↓</span>
+          <span class="tx-chain-name">${chainName(to)}</span>
+        </div>
+        <div class="tx-meta">
+          <div class="tx-amt">${usd ? fmtUSD(usd) : '—'}</div>
+          <div class="tx-date">${fmtDate(ts)}</div>
+        </div>
+        <span class="tx-status ${sc}">${sl}</span>
+      </div>`;
+  }).join('');
+
+  // Show More button
+  if(visibleCount < txs.length) {
+    const btn = document.createElement('button');
+    btn.className = 'show-more-btn';
+    btn.textContent = `Show more (${txs.length - visibleCount} remaining)`;
+    btn.onclick = ()=>{ visibleCount += 50; renderTxRows(); };
+    list.appendChild(btn);
+  }
+}
+
+// ── DOWNLOAD IMAGE CARD ──
+async function downloadCard() {
+  const card = document.getElementById('shareCard');
+  toast('⏳ Generating image...');
+  try {
+    const canvas = await html2canvas(card, {
+      backgroundColor: '#080c10',
+      scale: 2,
+      useCORS: true,
+    });
+    const link = document.createElement('a');
+    link.download = 'relay-stats.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('✓ Image downloaded!');
+  } catch(e) {
+    toast('Could not generate image — try copy instead');
+    console.error(e);
+  }
+}
+
+// ── SHARE ON X ──
+function shareX() {
+  const txs = allTxs;
+  let totalUSD = 0;
+  txs.forEach(tx=>{
+    totalUSD += parseFloat(tx?.data?.inAmountUsd||tx?.inAmountUsd||0);
+  });
+  const chains = Object.keys(
+    txs.reduce((a,tx)=>{
+      const f=tx?.data?.originChainId||tx?.originChainId;
+      if(f) a[f]=1; return a;
+    },{})
+  ).length;
+
+  const text = `Just checked my Relay bridge stats 🔗\n\n💰 ${fmtUSD(totalUSD)} total volume\n📊 ${txs.length} transactions\n⛓ ${chains} chains\n\nCheck yours for free 👇\n\nBuilt by @alpinoWolf`;
+  window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text),'_blank');
+}
+</script>
+</body>
+</html>
